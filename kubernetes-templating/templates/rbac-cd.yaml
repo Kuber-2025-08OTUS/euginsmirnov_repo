@@ -1,0 +1,19 @@
+{{- if .Values.rbac.cd }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: cd
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ .Release.Name }}-cd-admin
+subjects:
+- kind: ServiceAccount
+  name: cd
+  namespace: {{ .Release.Namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: admin
+{{- end }}

@@ -1,0 +1,24 @@
+
+replicaCount: 5
+
+image:
+  repository: bitnami/kafka
+  tag: "3.5.2"
+  pullPolicy: IfNotPresent
+
+auth:
+  clientProtocol: SASL_PLAINTEXT
+  interBrokerProtocol: SASL_PLAINTEXT
+  sasl:
+
+    mechanisms: [PLAIN]
+    interBrokerMechanism: PLAIN
+
+    jaas:
+      clientUsers: ["user1"]
+      clientPasswords: ["pass1"]
+      interBrokerUser: "interbroker"
+      interBrokerPassword: "interpass"
+
+service:
+  type: ClusterIP
