@@ -18,17 +18,43 @@ spec:
       labels:
         app: homework
     spec:
+      # важно: поды запускаются под SA с доступом к /metrics
       serviceAccountName: monitoring
+      # если используешь селектор — не забудь пролейблить ноду
       nodeSelector:
         homework: "true"
+
       volumes:
         - name: shared
           persistentVolumeClaim:
-            claimName: homework-pvc        # PVC вместо emptyDir
+            claimName: homework-pvc
         - name: conf
           configMap:
-            name: homework-conf            # ConfigMap с произвольными ключами
+            name: homework-conf
+
       initContainers:
+        # 1) тянем /metrics и сохраняем в metrics.html на PVC
+        - name: fetch-metrics
+          image: curlimages/curl:8.10.1
+          command:
+            - sh
+            - -c
+            - |
+              set -eu
+              URL="https://kubernetes.default.svc/metrics"
+              TOKEN="$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)"
+              # сохраним прямо в том, который станет /homework у приложения
+              mkdir -p /init
+              curl -sS --fail \
+                --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt \
+                -H "Authorization: Bearer ${TOKEN}" \
+                "${URL}" > /init/metrics.html
+                mkdir -p /init/metrics
+                cp /init/metrics.html /init/metrics/index.html
+          volumeMounts:
+            - name: shared
+              mountPath: /init
+        # 2) как и раньше — кладём index.html
         - name: init-index
           image: busybox:1.36
           command:
@@ -41,6 +67,7 @@ spec:
           volumeMounts:
             - name: shared
               mountPath: /init
+
       containers:
         - name: web
           image: busybox:1.36
@@ -48,7 +75,7 @@ spec:
             - sh
             - -c
             - |
-              # Запуск простого веб-сервера busybox на 8000 порту
+              # простой http-сервер, корень каталога /homework
               httpd -f -p 8000 -h /homework
           ports:
             - name: http
@@ -57,7 +84,7 @@ spec:
             - name: shared
               mountPath: /homework
             - name: conf
-              mountPath: /homework/conf     # доступно по URL /conf/<key>
+              mountPath: /homework/conf
               readOnly: true
           readinessProbe:
             httpGet:
@@ -68,7 +95,4 @@ spec:
           lifecycle:
             preStop:
               exec:
-                command:
-                  - sh
-                  - -c
-                  - rm -f /homework/index.html
+                command: ["sh","-c","rm -f /homework/index.html"]

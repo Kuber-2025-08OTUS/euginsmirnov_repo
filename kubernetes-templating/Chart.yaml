@@ -1,0 +1,6 @@
+apiVersion: v2
+name: hw6
+description: Homework chart — busybox httpd serves /homework with otus.ru copy and /metrics mirror
+type: application
+version: 0.1.0
+appVersion: "1.0.0"

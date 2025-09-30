@@ -1,0 +1,10 @@
+{{- if .Values.ingress.enabled }}
+Откройте: http://{{ .Values.ingress.host }}/
+- / — копия главной страницы otus.ru (initContainer скачивает при старте)
+- /metrics и /metrics/ — сохранённая копия apiserver /metrics
+{{- else }}
+Локально:
+  kubectl port-forward svc/{{ .Release.Name }} 8080:{{ .Values.service.port }}
+  http://127.0.0.1:8080/
+{{- end }}
+PVC: {{ if .Values.persistence.enabled }}включён{{ else }}выключен{{ end }}; StorageClass: {{ .Values.persistence.storageClassName }}.

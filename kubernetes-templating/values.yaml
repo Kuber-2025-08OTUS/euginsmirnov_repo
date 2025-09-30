@@ -1,0 +1,32 @@
+replicaCount: 3
+
+image:
+  repository: busybox
+  tag: "1.36"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8000
+
+ingress:
+  enabled: true
+  host: ejara1.ru          # поменяй на свой домен при необходимости
+  className: traefik       # для k3s по умолчанию
+
+persistence:
+  enabled: true
+  createStorageClass: true
+  storageClassName: sc-homework
+  accessModes: ["ReadWriteOnce"]
+  size: 1Gi
+  existingClaim: ""        # если указать имя PVC, создание нового не потребуется
+
+rbac:
+  monitoring: true   # SA + ClusterRole/Binding для чтения nonResourceURL /metrics
+  cd: true           # SA cd + RoleBinding admin в текущем ns
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

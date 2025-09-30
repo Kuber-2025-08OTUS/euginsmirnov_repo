@@ -1,0 +1,95 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-deployment
+  labels:
+    app: {{ .Release.Name }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}
+    spec:
+      {{- if .Values.rbac.monitoring }}
+      serviceAccountName: monitoring
+      {{- end }}
+      nodeSelector:
+        {{- toYaml .Values.nodeSelector | nindent 8 }}
+      volumes:
+        - name: shared
+          {{- if and .Values.persistence.enabled .Values.persistence.existingClaim }}
+          persistentVolumeClaim:
+            claimName: {{ .Values.persistence.existingClaim }}
+          {{- else if .Values.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ .Release.Name }}-pvc
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+        - name: conf
+          configMap:
+            name: {{ .Release.Name }}-conf
+      initContainers:
+        - name: fetch-metrics
+          image: curlimages/curl:8.10.1
+          command:
+            - sh
+            - -c
+            - |
+              set -eu
+              URL="https://kubernetes.default.svc/metrics"
+              TOKEN="$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)"
+              mkdir -p /init
+              curl -sS --fail                 --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt                 -H "Authorization: Bearer ${TOKEN}"                 "${URL}" > /init/metrics.html
+              # чтобы работало и /metrics и /metrics/
+              mkdir -p /init/metrics
+              cp /init/metrics.html /init/metrics
+              cp /init/metrics.html /init/metrics/index.html
+          volumeMounts:
+            - name: shared
+              mountPath: /init
+        - name: init-index
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              set -eu
+              mkdir -p /init
+              wget -q -O /init/index.html http://otus.ru
+          volumeMounts:
+            - name: shared
+              mountPath: /init
+      containers:
+        - name: web
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["sh","-c","httpd -f -p {{ .Values.service.targetPort }} -h /homework"]
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.targetPort }}
+          volumeMounts:
+            - name: shared
+              mountPath: /homework
+            - name: conf
+              mountPath: /homework/conf
+              readOnly: true
+          readinessProbe:
+            httpGet:
+              path: /index.html
+              port: {{ .Values.service.targetPort }}
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          lifecycle:
+            preStop:
+              exec:
+                command: ["sh","-c","rm -f /homework/index.html"]

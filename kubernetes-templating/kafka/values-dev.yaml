@@ -1,0 +1,21 @@
+# 1 брокер
+replicaCount: 1
+
+image:
+  repository: bitnami/kafka
+  pullPolicy: IfNotPresent
+
+auth:
+  clientProtocol: PLAINTEXT
+  interBrokerProtocol: PLAINTEXT
+
+authorization:
+  enabled: false
+
+persistence:
+  enabled: true
+  size: 1Gi
+  storageClass: local-path
+
+service:
+  type: ClusterIP
